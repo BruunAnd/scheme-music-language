@@ -49,7 +49,7 @@
 (define (is-element-of-type type)
   (lambda (element)
     (cond ((list? element)
-           (let ((lookup (assq 'type element)))
+           (let ((lookup (assoc 'type element)))
              (cond ((pair? lookup)
                     (eq? (cdr lookup) type))
                    (else #f))))
@@ -74,7 +74,7 @@
 ; Accessor functions
 (define (get-key key element)
   (cond ((list? element)
-         (let ((lookup (assq key element)))
+         (let ((lookup (assoc key element)))
            (cond ((pair? lookup)
                   (cdr lookup))
                  (else (error("Could not look up key from association list."))))))
@@ -86,7 +86,7 @@
          (get-key 'duration element))
         (else (error("Cannot get duration from something that is not a note or an element.")))))
             
-; Maker functions. This collection of functions is used to create the different music elements.
+; Constructor functions. This collection of functions is used to create the different music elements.
 (define (make-pause pause-duration)
   (cond ((duration? pause-duration)
         '((type pause-type) (duration pause-duration)))
