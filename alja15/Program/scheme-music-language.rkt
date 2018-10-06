@@ -2,10 +2,30 @@
 ; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>
 ; Study number: 20154059
 
+; Utility functions from exercise solutions
+; Written by Kurt Nørmark
+(define (pair-up key-list value-list)
+  (if (or (null? key-list) (null? value-list))
+      '()
+      (cons
+       (cons (car key-list) (car value-list))
+       (pair-up (cdr key-list) (cdr value-list)))))
+
 ; Basic music theory definitions
-(define instruments '(piano organ guitar violin flute trumpet helicopter telephone))
+(define instrument-channels '((piano 1) (organ 2) (guitar 3) (violin 4) (flute 5) (trumpet 6) (helicopter 7) (telephone 8)))
 
 ; Helper functions
+; Get the channel from an instrument
+(define (instrument-channel instrument)
+  (if (instrument? instrument)
+      (assoc instrument instrument-channels)
+      (error("Cannot get channel from something which is not an instrument."))))
+
+; Check if an instrument is valid
+(define (instrument? instrument)
+  (let ((lookup (assoc instrument instrument-channels)))
+    (pair? lookup)))
+
 ; Checks if a duration is valid
 (define (duration? duration)
   (and (integer? duration)
@@ -89,5 +109,8 @@
 ; Constructor functions. This collection of functions is used to create the different music elements.
 (define (make-pause pause-duration)
   (cond ((duration? pause-duration)
-        '((type pause-type) (duration pause-duration)))
+         (pair-up ('type 'duration) ('pause-type pause-duration))
+        )
         (else error("Cannot make a pause element with an invalid duration."))))
+
+(make-pause 10)
