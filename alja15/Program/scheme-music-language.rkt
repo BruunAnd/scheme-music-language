@@ -198,3 +198,4 @@ note
 
 ; notes to self
 ; calculate duration of par using max
+; re-instrument and scale may use the higher order map function
