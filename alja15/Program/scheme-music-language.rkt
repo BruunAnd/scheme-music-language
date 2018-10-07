@@ -269,34 +269,33 @@
          ((composition? element) (add-property 'members (map (lambda (e) (transpose offset e)) (get-elements element)) element))
          (else error("Cannot transpose a non-music element."))))
 
-; Linearize a representation
+; Linearize a representation, starting at offset 0
 (define (linearize element)
   (linearize-helper element 0))
 
+; In our base case we have a note and we use the constructor provided by KN to make an absolute note
 (define (linearize-note element offset)
   (list (note-abs-time-with-duration offset (get-instrument-channel (get-instrument element)) (get-pitch element) 80 (get-duration element))))
 
+; When we linearize the tail of the sequence, we must add the length of the head
 (define (linearize-sequence elements offset)
   (if (null? elements) '()
       (let ((head (car elements)))
         (append (linearize-helper head offset) (linearize-sequence (cdr elements) (+ (get-duration head) offset))))))
 
+; When we linearize the tail of a parallel composition, we use the same offset as the initial one in the tail
 (define (linearize-parallel elements offset)
   (if (null? elements) '()
       (let ((head (car elements)))
         (append (linearize-helper head offset) (linearize-parallel (cdr elements) offset)))))
 
 ; This is why linearization is delegated to other helper functions
-; Note that the composition helpers handle updating offsets 
+; Note that the composition helpers handle updating offsets. Pauses "return" nothing, they serve only to update the offsets
 (define (linearize-helper element offset)
   (cond ((note? element) (linearize-note element offset))
         ((sequence? element) (linearize-sequence (get-elements element) offset))
         ((parallel? element) (linearize-parallel (get-elements element) offset))
         ((pause? element) '())))
-
-; notes to self
-; calculate duration of par using max
-; re-instrument and scale may use the higher order map function
 
 (define noteC (note! 'F 8 'piano 1/4))
 (define noteB (note! 'B 2 'organ 3/4))
@@ -310,4 +309,4 @@
 (define longer-sequence (sequence! sequence noteB noteC pause noteC pause pause noteB noteB pause noteB))
 (define much-longer (sequence! longer-sequence longer-sequence longer-sequence))
 
-(linearize (sequence! (parallel! annoying much-longer) (transpose 60 noteA)))
+(linearize (sequence! (parallel! annoying much-longer) pause pause pause noteA))
