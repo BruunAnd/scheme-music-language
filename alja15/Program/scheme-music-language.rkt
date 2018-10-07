@@ -187,17 +187,6 @@
                                (music-elements? (cdr elements))))
         (else #f)))
 
-; Utility functions for music elements
-
-; Setters for existing elements
-; Update the instrument of a music element
-(define (set-instrument instrument element)
-  (cond ((note? element) (add-property 'instrument instrument element))
-        ((pause? element) element)
-        ((composition? element)
-         (add-property 'elements (map (lambda (e) (set-instrument instrument e)) (get-elements element)) element))
-        (else error("Not a music element."))))
-
 ; Accessor functions
 ; Gets the elements from a composition element
 (define (get-elements element)
@@ -245,6 +234,20 @@
 (define (parallel! . elements)
   (composition! 'parallel-type elements))
 
+; Utility functions for music elements
+; Update the instrument of a music element
+(define (set-instrument instrument element)
+  (cond ((note? element) (add-property 'instrument instrument element))
+        ((pause? element) element)
+        ((composition? element) (add-property 'elements (map (lambda (e) (set-instrument instrument e)) (get-elements element)) element))
+        (else error("Cannot set instrument of a non-music element."))))
+
+; Scale a music element with some factor
+(define (scale factor element)
+  (cond ((or (note? element) (pause? element)) (add-property 'duration (* factor (get-duration element)) element))
+        ((composition? element) (add-property 'members (map (lambda (e) (scale factor e)) (get-elements element)) element))
+        (else error("Cannot scale a non-music element."))))
+
 ; notes to self
 ; calculate duration of par using max
 ; re-instrument and scale may use the higher order map function
@@ -256,3 +259,5 @@
 (define sequence (sequence! noteB pause noteC))
 (define parallel (parallel! sequence sequence noteB))
 (parallel? (set-instrument 'helicopter parallel))
+(scale 5 noteC)
+(scale 10 parallel)
