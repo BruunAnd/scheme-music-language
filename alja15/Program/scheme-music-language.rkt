@@ -1,6 +1,5 @@
 #lang racket
-; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>
-; Study number: 20154059
+; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>, study number: 20154059
 
 ; Useful association list functions
 ; Add property to element
@@ -15,7 +14,7 @@
                  (else (error("Could not look up key from association list."))))))
         (else (error("Element is not an association list.")))))
 
-; Written by Kurt Nørmark (TODO: Ask if allowed)
+; Written by KN as an exercise solution (TODO: Ask if allowed)
 (define (pair-up key-list value-list)
   (if (or (null? key-list) (null? value-list))
       '()
@@ -23,7 +22,11 @@
        (cons (car key-list) (car value-list))
        (pair-up (cdr key-list) (cdr value-list)))))
 
-; One of theigher order functions provided on Moodle
+; Constructor for low level representation provided by KN
+(define (note-abs-time-with-duration abs-time channel note-number velocity duration)
+  (cons 'note-abs-time-with-duration (list abs-time channel note-number velocity duration)))
+
+; One of the higher order functions provided on Moodle
 (define (accumulate f init lst)
   (if (null? lst)
       init
@@ -52,7 +55,7 @@
     (pair? lookup)))
 
 ; Get the channel from an instrument
-(define (instrument-channel instrument)
+(define (get-instrument-channel instrument)
   (if (instrument? instrument)
       (cdr (assoc instrument instrument-channels))
       (error("Cannot get channel from something which is not an instrument."))))
@@ -172,11 +175,15 @@
         (else #f)))
 
 ; Accessor functions
+; Gets the instrument from a note element
+(define (get-instrument element)
+  (cond ((note? element) (get-value 'instrument element))
+        (else (error("Cannot get instrument from something that is not a note.")))))
+
 ; Gets the elements from a composition element
 (define (get-elements element)
-  (if (composition? element)
-      (get-value 'elements element)
-      (error("Cannot get elements from non-composition type."))))
+  (cond ((composition? element) (get-value 'elements element))
+        (else error("Cannot get elements from non-composition type."))))
 
 ; Gets the pitch from a note element
 (define (get-pitch element)
@@ -261,18 +268,44 @@
                (error("Transposition would result in an illegal pitch.")))))
          ((composition? element) (add-property 'members (map (lambda (e) (transpose offset e)) (get-elements element)) element))
          (else error("Cannot transpose a non-music element."))))
-           
+
+; Linearize a representation
+(define (linearize element)
+  (linearize-helper element 0))
+
+(define (linearize-note element offset)
+  (list (note-abs-time-with-duration offset (get-instrument-channel (get-instrument element)) (get-pitch element) 80 (get-duration element))))
+
+(define (linearize-sequence elements offset)
+  (if (null? elements) '()
+      (let ((head (car elements)))
+        (append (linearize-helper head offset) (linearize-sequence (cdr elements) (+ (get-duration head) offset))))))
+
+(define (linearize-parallel elements offset)
+  (if (null? elements) '()
+      (let ((head (car elements)))
+        (append (linearize-helper head offset) (linearize-parallel (cdr elements) (max (get-duration head) offset))))))
+
+; This is why linearization is delegated to other helper functions
+; Note that the composition helpers handle updating offsets 
+(define (linearize-helper element offset)
+  (cond ((note? element) (linearize-note element offset))
+        ((sequence? element) (linearize-sequence (get-elements element) offset))
+        ((parallel? element) (linearize-parallel (get-elements element) offset))
+        ((pause? element) '())))
+
 ; notes to self
 ; calculate duration of par using max
 ; re-instrument and scale may use the higher order map function
 
-(define noteC (note! 'C# 4 'guitar 1/4))
-(define noteB (note! 'B 2 'piano 3/4))
+(define noteC (note! 'F 8 'piano 1/4))
+(define noteB (note! 'B 2 'organ 3/4))
 (define pause (pause! 2/4))
 
-(define sequence (sequence! noteB pause noteC))
-(define longer-sequence (sequence! noteB noteB noteB noteB))
-(define parallel (parallel! sequence sequence noteB longer-sequence))
+(define sequence (sequence! noteB noteC))
+(define longer-sequence (sequence! noteB noteC pause noteC pause pause noteB noteB pause noteB))
+(define parallel (parallel! pause sequence sequence))
 (get-duration parallel)
 (get-duration sequence)
 (get-duration noteC)
+(linearize longer-sequence)
