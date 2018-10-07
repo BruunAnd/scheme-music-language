@@ -284,7 +284,7 @@
 (define (linearize-parallel elements offset)
   (if (null? elements) '()
       (let ((head (car elements)))
-        (append (linearize-helper head offset) (linearize-parallel (cdr elements) (max (get-duration head) offset))))))
+        (append (linearize-helper head offset) (linearize-parallel (cdr elements) offset)))))
 
 ; This is why linearization is delegated to other helper functions
 ; Note that the composition helpers handle updating offsets 
@@ -300,12 +300,14 @@
 
 (define noteC (note! 'F 8 'piano 1/4))
 (define noteB (note! 'B 2 'organ 3/4))
+(define noteA (note! 'A# 4 'trumpet 1/2))
+(define noteD (note! 'A# 8 'violin 1/2))
 (define pause (pause! 2/4))
-
+(define annoying (sequence! noteA noteD noteA noteA noteD noteA noteA noteD noteA noteA noteD noteA))
 (define sequence (sequence! noteB noteC))
-(define longer-sequence (sequence! noteB noteC pause noteC pause pause noteB noteB pause noteB))
-(define parallel (parallel! pause sequence sequence))
-(get-duration parallel)
-(get-duration sequence)
-(get-duration noteC)
-(linearize longer-sequence)
+(define sequence2 (sequence! noteC pause noteB))
+
+(define longer-sequence (sequence! sequence noteB noteC pause noteC pause pause noteB noteB pause noteB))
+(define much-longer (sequence! longer-sequence longer-sequence longer-sequence))
+
+(linearize (sequence! (parallel! annoying much-longer) (transpose 60 noteA)))
