@@ -11,9 +11,15 @@
        (cons (car key-list) (car value-list))
        (pair-up (cdr key-list) (cdr value-list)))))
 
+; Additional definitions to increase readability
+(define pair-contents cdr)
+
 ; Music theory
+(define beats-per-minute 100)
+(define time-units-per-second 960)
+
 ; We are dealing with a number of instruments which have a MIDI channel associated with them.
-; This definition is an association list which pairs instruments with these channels.
+; This definition is an association list which pairs instruments with these channels
 (define instrument-channels '((piano . 1)
                               (organ . 2)
                               (guitar . 3)
@@ -24,7 +30,7 @@
                               (telephone . 8)))
 
 ; We are also dealing with a number of note names. These all have some base value which
-; is used when calculating the pitch of a note. 
+; is used when calculating the pitch of a note
 (define note-names '((C . 0)
                      (C# . 1)
                      (D . 2)
@@ -51,7 +57,7 @@
 ; Get the channel from an instrument
 (define (instrument-channel instrument)
   (if (instrument? instrument)
-      (cdr (assoc instrument instrument-channels))
+      (pair-contents (assoc instrument instrument-channels))
       (error("Cannot get channel from something which is not an instrument."))))
 
 ; Get the base pitch from a note name
@@ -59,6 +65,13 @@
   (if (note-name? note-name)
       (get-value note-name note-names)
       (error ("Cannot get note name base from something which is not a note name."))))
+
+; Get the duration in actual time units given rational length
+(define (get-duration-from-length length)
+  (if (rational? length)
+      (let ((seconds-per-beat (/ 60 beats-per-minute)))
+        seconds-per-beat)
+      (error ("Length must be a rational number."))))
 
 ; Get pitch given a note name and octave
 (define (get-pitch note-name octave)
@@ -68,41 +81,42 @@
         (+ base (* 12 octave)))
       (error ("Invalid note name or octave provided when getting pitch."))))
 
+; An inclusive check for whether an integer is in some range
 (define (is-int-in-range value lower upper)
   (and (integer? value)
        (>= value lower)
        (<= value upper)))
 
-; Checks if a duration is valid
+; Check if a duration is valid
 (define (duration? duration)
   (and (integer? duration)
        (>= duration 0)))
 
-; Checks if a pitch value is in the valid range
+; Check if a pitch value is in the valid range
 (define (pitch? value)
   (is-int-in-range value 0 127))
 
-; Checks if an octave value is in the valid range
+; Check if an octave value is in the valid range
 (define (octave? value)
   (is-int-in-range value 1 8))
 
-; Checks if a type is a note type
+; Check if a type is a note type
 (define (note-type? type)
   (eq? type 'note))
 
-; Checks if a type is a pause type
+; Check if a type is a pause type
 (define (pause-type? type)
   (eq? type 'pause))
 
-; Checks if a type is a sequence type
+; Check if a type is a sequence type
 (define (seq-type? type)
   (eq? type 'sequential))
 
-; Checks if a type is a parallel composition type
+; Check if a type is a parallel composition type
 (define (par-type? type)
   (eq? type 'par))
 
-; Checks if a type is a music type
+; Check if a type is a music type
 (define (music-type? type)
   (or (note-type? type)
       (pause-type? type)
@@ -121,7 +135,7 @@
     (cond ((list? element)
            (let ((lookup (assoc 'type element)))
              (cond ((pair? lookup)
-                    (eq? (cdr lookup) type))
+                    (eq? (pair-contents lookup) type))
                    (else #f))))
           (else #f))))
 
@@ -146,7 +160,7 @@
   (cond ((list? element)
          (let ((lookup (assoc key element)))
            (cond ((pair? lookup)
-                  (cdr lookup))
+                  (pair-contents lookup))
                  (else (error("Could not look up key from association list."))))))
         (else (error("Element is not an association list.")))))
 
@@ -162,8 +176,11 @@
   (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
         (else error("Invalid arguments passed to pause element."))))
 
-(define (note! note-name octave instrument duration)
-  (let ((pitch (get-pitch note-name octave)))
+; Creates a note element. Performs various Check to validate that the arguments
+; Two internal values (duration and pitch) are calculated before creating the note
+(define (note! note-name octave instrument length)
+  (let* ((pitch (get-pitch note-name octave))
+         (duration (get-duration-from-length length)))
     (cond ((and (duration? duration)
                 (instrument? instrument)
                 (pitch? pitch))
@@ -173,5 +190,11 @@
 (define pause (pause! 10))
 (pause? pause)
 
+(get-duration-from-length 1/4)
+
 (define note (note! 'A 4 'guitar 8))
 (note? note)
+note
+
+; notes to self
+; calculate duration of par using max
