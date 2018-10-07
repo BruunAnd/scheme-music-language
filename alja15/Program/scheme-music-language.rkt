@@ -3,7 +3,7 @@
 ; Study number: 20154059
 
 ; Utility functions from exercise solutions
-; Written by Kurt Nørmark
+; Written by Kurt Nørmark (TODO: Ask if allowed)
 (define (pair-up key-list value-list)
   (if (or (null? key-list) (null? value-list))
       '()
@@ -11,31 +11,80 @@
        (cons (car key-list) (car value-list))
        (pair-up (cdr key-list) (cdr value-list)))))
 
-; Basic music theory definitions
-(define instrument-channels '((piano 1) (organ 2) (guitar 3) (violin 4) (flute 5) (trumpet 6) (helicopter 7) (telephone 8)))
+; Music theory
+; We are dealing with a number of instruments which have a MIDI channel associated with them.
+; This definition is an association list which pairs instruments with these channels.
+(define instrument-channels '((piano . 1)
+                              (organ . 2)
+                              (guitar . 3)
+                              (violin . 4)
+                              (flute . 5)
+                              (trumpet . 6)
+                              (helicopter . 7)
+                              (telephone . 8)))
 
-; Helper functions
-; Get the channel from an instrument
-(define (instrument-channel instrument)
-  (if (instrument? instrument)
-      (assoc instrument instrument-channels)
-      (error("Cannot get channel from something which is not an instrument."))))
+; We are also dealing with a number of note names. These all have some base value which
+; is used when calculating the pitch of a note. 
+(define note-names '((C . 0)
+                     (C# . 1)
+                     (D . 2)
+                     (D# . 3)
+                     (E . 4)
+                     (F . 5)
+                     (F# . 6)
+                     (G . 7)
+                     (G# . 8)
+                     (A . 9)
+                     (A# . 10)
+                     (B . 11)))
 
+; Check if a note name is valid
+(define (note-name? note-name)
+  (let ((lookup (assoc note-name note-names)))
+    (pair? lookup)))
+  
 ; Check if an instrument is valid
 (define (instrument? instrument)
   (let ((lookup (assoc instrument instrument-channels)))
     (pair? lookup)))
+
+; Get the channel from an instrument
+(define (instrument-channel instrument)
+  (if (instrument? instrument)
+      (cdr (assoc instrument instrument-channels))
+      (error("Cannot get channel from something which is not an instrument."))))
+
+; Get the base pitch from a note name
+(define (note-name-base note-name)
+  (if (note-name? note-name)
+      (get-value note-name note-names)
+      (error ("Cannot get note name base from something which is not a note name."))))
+
+; Get pitch given a note name and octave
+(define (get-pitch note-name octave)
+  (if (and (note-name? note-name)
+           (octave? octave))
+      (let ((base (note-name-base note-name)))
+        (+ base (* 12 octave)))
+      (error ("Invalid note name or octave provided when getting pitch."))))
+
+(define (is-int-in-range value lower upper)
+  (and (integer? value)
+       (>= value lower)
+       (<= value upper)))
 
 ; Checks if a duration is valid
 (define (duration? duration)
   (and (integer? duration)
        (>= duration 0)))
 
-; Checks if a pitch value is valid
+; Checks if a pitch value is in the valid range
 (define (pitch? value)
-  (and (integer? value)
-       (and (>= value 0)
-            (<= value 127))))
+  (is-int-in-range value 0 127))
+
+; Checks if an octave value is in the valid range
+(define (octave? value)
+  (is-int-in-range value 1 8))
 
 ; Checks if a type is a note type
 (define (note-type? type)
@@ -66,6 +115,7 @@
 ; Helper function which returns a function for checking whether some
 ; element is of a type. Returns #f if the element is not a list, or
 ; if assq returns something that is not a pair.
+; TODO: Use some form of has-key and get-value-value instead
 (define (is-element-of-type type)
   (lambda (element)
     (cond ((list? element)
@@ -76,23 +126,23 @@
           (else #f))))
 
 ; Check if an element is a note.
-(define is-element-note?
-  (is-element-of-type 'note))
+(define note?
+  (is-element-of-type 'note-type))
 
 ; Check if an element is a pause.
-(define is-element-pause?
-  (is-element-of-type 'pause))
+(define pause?
+  (is-element-of-type 'pause-type))
 
 ; Check if an element is a sequence.
-(define is-element-seq?
-  (is-element-of-type 'seq))
+(define seq?
+  (is-element-of-type 'seq-type))
 
 ; Check if an element is a parallel composition.
-(define is-element-par?
-  (is-element-of-type 'par))
+(define par?
+  (is-element-of-type 'par-type))
 
 ; Accessor functions
-(define (get-key key element)
+(define (get-value key element)
   (cond ((list? element)
          (let ((lookup (assoc key element)))
            (cond ((pair? lookup)
@@ -102,15 +152,26 @@
 
 ; Gets the duration from an element, given that is it either a pause or a note
 (define (get-duration element)
-  (cond ((or (is-element-pause? element) (is-element-note? element))
-         (get-key 'duration element))
+  (cond ((or (pause? element) (note? element))
+         (get-value 'duration element))
         (else (error("Cannot get duration from something that is not a note or an element.")))))
             
 ; Constructor functions. This collection of functions is used to create the different music elements.
-(define (make-pause pause-duration)
-  (cond ((duration? pause-duration)
-         (pair-up ('type 'duration) ('pause-type pause-duration))
-        )
-        (else error("Cannot make a pause element with an invalid duration."))))
+; Create a pause element. Outputs an error if the duration is invalid
+(define (pause! duration)
+  (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
+        (else error("Invalid arguments passed to pause element."))))
 
-(make-pause 10)
+(define (note! note octave instrument duration)
+  (cond ((and (duration? duration)
+              (instrument? instrument)
+              #t)
+         (pair-up '(type pitch instrument duration) (list 'note-type 0 instrument duration)))
+        (else error("Invalid arguments passed to note element."))))
+
+(define pause (pause! 10))
+(pause? pause)
+
+(define note (note! 'C# 0 'guitar 10))
+(+ 1 (note-name-base 'C#))
+(instrument-channel 'guitar)
