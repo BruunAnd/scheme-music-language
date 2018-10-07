@@ -87,7 +87,7 @@
       (error ("Length must be a rational number."))))
 
 ; Get pitch given a note name and octave
-(define (get-pitch note-name octave)
+(define (get-pitch-from-note-octave note-name octave)
   (if (and (note-name? note-name)
            (octave? octave))
       (let ((base (note-name-base note-name)))
@@ -194,13 +194,18 @@
       (get-value 'elements element)
       (error("Cannot get elements from non-composition type."))))
 
+; Gets the pitch from a note element
+(define (get-pitch element)
+  (cond ((note? element) (get-value 'pitch element))
+        (else (error("Cannot get pitch from something that is not a note.")))))
+
 ; Gets the duration from an element, given that is it either a pause or a note
 (define (get-duration element)
   (cond ((or (pause? element) (note? element))
          (get-value 'duration element))
         (else (error("Cannot get duration from something that is not a note or an element.")))))
             
-; Constructor functions. This collection of functions is used to create the different music elements.
+; Constructor functions. This collection of functions is used to create the different music elements
 ; Create a pause element. Outputs an error if the duration is invalid
 (define (pause! length)
   (let ((duration (get-duration-from-length length)))
@@ -211,7 +216,7 @@
 ; Creates a note element. Performs various Check to validate that the arguments
 ; Two internal values (duration and pitch) are calculated before creating the note
 (define (note! note-name octave instrument length)
-  (let* ((pitch (get-pitch note-name octave))
+  (let* ((pitch (get-pitch-from-note-octave note-name octave))
          (duration (get-duration-from-length length)))
     (cond ((and (duration? duration)
                 (instrument? instrument)
@@ -227,15 +232,20 @@
       (error("All elements of a composition must be music elements."))))
 
 ; Creates a sequential composition element
+; Accepts a variable number of parameters which are the elements of the composition
 (define (sequence! . elements)
   (composition! 'sequence-type elements))
 
 ; Creates a parallel composition element
+; Accepts a variable number of parameters which are the elements of the composition
 (define (parallel! . elements)
   (composition! 'parallel-type elements))
 
 ; Utility functions for music elements
 ; Update the instrument of a music element
+; For pauses, simply return the pause element because it has no instrument
+; For notes, return a new version of the note where the instrument property has been set to the new instrument
+; For compositions, return new versions of the compositions where the elements of the compositions have been mapped to the re-instrument function
 (define (set-instrument instrument element)
   (cond ((note? element) (add-property 'instrument instrument element))
         ((pause? element) element)
@@ -243,11 +253,27 @@
         (else error("Cannot set instrument of a non-music element."))))
 
 ; Scale a music element with some factor
+; For notes and pauses, return new elements where the duration has been multiplied
+; For compositions, return new compositions where the elements have been mapped to scaled elements
 (define (scale factor element)
   (cond ((or (note? element) (pause? element)) (add-property 'duration (* factor (get-duration element)) element))
         ((composition? element) (add-property 'members (map (lambda (e) (scale factor e)) (get-elements element)) element))
         (else error("Cannot scale a non-music element."))))
 
+; Transpose a music element with some value
+; No need to do anything about pauses
+; For notes, check if the transposed pitch would exceed the legal bounds of pitches
+; For compositions, return a new composition where its elements have been mapped to transposed elements
+(define (transpose offset element)
+  (cond ((pause? element) element)
+        ((note? element)
+         (let ((new-pitch (+ offset (get-pitch element))))
+           (if (pitch? new-pitch)
+               (add-property 'pitch new-pitch element)
+               (error("Transposition would result in an illegal pitch.")))))
+         ((composition? element) (add-property 'members (map (lambda (e) (transpose offset e)) (get-elements element)) element))
+         (else error("Cannot transpose a non-music element."))))
+           
 ; notes to self
 ; calculate duration of par using max
 ; re-instrument and scale may use the higher order map function
@@ -261,3 +287,5 @@
 (parallel? (set-instrument 'helicopter parallel))
 (scale 5 noteC)
 (scale 10 parallel)
+(transpose 10 noteC)
+(transpose 10 sequence)
