@@ -24,6 +24,12 @@
        (cons (car key-list) (car value-list))
        (pair-up (cdr key-list) (cdr value-list)))))
 
+; One of theigher order functions provided on Moodle
+(define (accumulate f init lst)
+  (if (null? lst)
+      init
+      (f (car lst) (accumulate f init (cdr lst)))))
+
 ; Additional definitions to increase readability
 (define pair-contents cdr)
 
@@ -199,18 +205,24 @@
   (cond ((note? element) (get-value 'pitch element))
         (else (error("Cannot get pitch from something that is not a note.")))))
 
-; Gets the duration from an element, given that is it either a pause or a note
+; Gets the duration from an element
+; For notes and pauses, we simply get the duration from the duration key
+; For sequential compositions, we use the higher-order function reduce on the elements of the sequence, which are first mapped to a list of durations
+; For parallel compositions, we apply the function max on the elements of a sequence
+; Because both compositions use them, I use let to bind mapped-elements
 (define (get-duration element)
-  (cond ((or (pause? element) (note? element))
-         (get-value 'duration element))
+  (cond ((or (pause? element) (note? element)) (get-value 'duration element))
+        ((composition? element)
+         (let ((mapped-elements (map (lambda (e) (get-duration e)) (get-elements element))))
+           (cond ((sequence? element) (accumulate + 0 mapped-elements))
+                 ((parallel? element) (apply max mapped-elements)))))
         (else (error("Cannot get duration from something that is not a note or an element.")))))
             
 ; Constructor functions. This collection of functions is used to create the different music elements
 ; Create a pause element. Outputs an error if the duration is invalid
 (define (pause! length)
   (let ((duration (get-duration-from-length length)))
-        (cond ((duration? duration)
-               (pair-up '(type duration) (list 'pause-type duration)))
+        (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
         (else error("Invalid arguments passed to pause element.")))))
 
 ; Creates a note element. Performs various Check to validate that the arguments
@@ -218,9 +230,7 @@
 (define (note! note-name octave instrument length)
   (let* ((pitch (get-pitch-from-note-octave note-name octave))
          (duration (get-duration-from-length length)))
-    (cond ((and (duration? duration)
-                (instrument? instrument)
-                (pitch? pitch))
+    (cond ((and (duration? duration) (instrument? instrument) (pitch? pitch))
            (pair-up '(type pitch instrument duration) (list 'note-type pitch instrument duration)))
           (else error("Invalid arguments passed to note element.")))))
 
@@ -283,9 +293,8 @@
 (define pause (pause! 2/4))
 
 (define sequence (sequence! noteB pause noteC))
-(define parallel (parallel! sequence sequence noteB))
-(parallel? (set-instrument 'helicopter parallel))
-(scale 5 noteC)
-(scale 10 parallel)
-(transpose 10 noteC)
-(transpose 10 sequence)
+(define longer-sequence (sequence! noteB noteB noteB noteB))
+(define parallel (parallel! sequence sequence noteB longer-sequence))
+(get-duration parallel)
+(get-duration sequence)
+(get-duration noteC)
