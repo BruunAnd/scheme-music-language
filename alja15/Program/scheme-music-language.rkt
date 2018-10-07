@@ -11,8 +11,7 @@
 (define (get-value key element)
   (cond ((list? element)
          (let ((lookup (assoc key element)))
-           (cond ((pair? lookup)
-                  (pair-contents lookup))
+           (cond ((pair? lookup) (cdr lookup))
                  (else (error("Could not look up key from association list."))))))
         (else (error("Element is not an association list.")))))
 
@@ -30,38 +29,17 @@
       init
       (f (car lst) (accumulate f init (cdr lst)))))
 
-; Additional definitions to increase readability
-(define pair-contents cdr)
-
 ; Music theory
 (define beats-per-minute 100)
 (define time-units-per-second 960)
 
 ; We are dealing with a number of instruments which have a MIDI channel associated with them.
 ; This definition is an association list which pairs instruments with these channels
-(define instrument-channels '((piano . 1)
-                              (organ . 2)
-                              (guitar . 3)
-                              (violin . 4)
-                              (flute . 5)
-                              (trumpet . 6)
-                              (helicopter . 7)
-                              (telephone . 8)))
+(define instrument-channels '((piano . 1) (organ . 2) (guitar . 3) (violin . 4) (flute . 5) (trumpet . 6) (helicopter . 7) (telephone . 8)))
 
 ; We are also dealing with a number of note names. These all have some base value which
 ; is used when calculating the pitch of a note
-(define note-names '((C . 0)
-                     (C# . 1)
-                     (D . 2)
-                     (D# . 3)
-                     (E . 4)
-                     (F . 5)
-                     (F# . 6)
-                     (G . 7)
-                     (G# . 8)
-                     (A . 9)
-                     (A# . 10)
-                     (B . 11)))
+(define note-names '((C . 0) (C# . 1) (D . 2) (D# . 3) (E . 4) (F . 5) (F# . 6) (G . 7) (G# . 8) (A . 9) (A# . 10) (B . 11)))
 
 ; Check if a note name is valid
 (define (note-name? note-name)
@@ -76,7 +54,7 @@
 ; Get the channel from an instrument
 (define (instrument-channel instrument)
   (if (instrument? instrument)
-      (pair-contents (assoc instrument instrument-channels))
+      (cdr (assoc instrument instrument-channels))
       (error("Cannot get channel from something which is not an instrument."))))
 
 ; Get the base pitch from a note name
@@ -86,16 +64,16 @@
       (error ("Cannot get note name base from something which is not a note name."))))
 
 ; Get the duration in actual time units given rational length
+; The formula is based on a post from Music StackExchange
+; UnitsPerSecond * Length * 60 * 4 / BPM
 (define (get-duration-from-length length)
   (if (rational? length)
-      (let ((seconds-per-beat (/ 60 beats-per-minute)))
-        100) ; TODO: Get actual duration
+      (* (* length (* 60 (/ 4 beats-per-minute))) time-units-per-second)
       (error ("Length must be a rational number."))))
 
 ; Get pitch given a note name and octave
 (define (get-pitch-from-note-octave note-name octave)
-  (if (and (note-name? note-name)
-           (octave? octave))
+  (if (and (note-name? note-name) (octave? octave))
       (let ((base (note-name-base note-name)))
         (+ base (* 12 octave)))
       (error ("Invalid note name or octave provided when getting pitch."))))
@@ -154,7 +132,7 @@
     (cond ((list? element)
            (let ((lookup (assoc 'type element)))
              (cond ((pair? lookup)
-                    (eq? (pair-contents lookup) type))
+                    (eq? (cdr lookup) type))
                    (else #f))))
           (else #f))))
 
@@ -216,7 +194,7 @@
          (let ((mapped-elements (map (lambda (e) (get-duration e)) (get-elements element))))
            (cond ((sequence? element) (accumulate + 0 mapped-elements))
                  ((parallel? element) (apply max mapped-elements)))))
-        (else (error("Cannot get duration from something that is not a note or an element.")))))
+        (else (error("Cannot get duration from a non-music element.")))))
             
 ; Constructor functions. This collection of functions is used to create the different music elements
 ; Create a pause element. Outputs an error if the duration is invalid
