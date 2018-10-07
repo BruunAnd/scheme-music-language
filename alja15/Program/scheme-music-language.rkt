@@ -70,7 +70,7 @@
 (define (get-duration-from-length length)
   (if (rational? length)
       (let ((seconds-per-beat (/ 60 beats-per-minute)))
-        seconds-per-beat)
+        100) ; TODO: Get actual duration
       (error ("Length must be a rational number."))))
 
 ; Get pitch given a note name and octave
@@ -109,19 +109,19 @@
   (eq? type 'pause))
 
 ; Check if a type is a sequence type
-(define (seq-type? type)
+(define (sequence-type? type)
   (eq? type 'sequential))
 
 ; Check if a type is a parallel composition type
-(define (par-type? type)
+(define (parallel-type? type)
   (eq? type 'par))
 
 ; Check if a type is a music type
 (define (music-type? type)
   (or (note-type? type)
       (pause-type? type)
-      (seq-type? type)
-      (par-type? type)))
+      (sequence-type? type)
+      (parallel-type? type)))
 
 ; All music elements in my music language are association lists
 ; As such, I can check if some list is a music element by checking its type.
@@ -148,12 +148,16 @@
   (is-element-of-type 'pause-type))
 
 ; Check if an element is a sequence.
-(define seq?
-  (is-element-of-type 'seq-type))
+(define sequence?
+  (is-element-of-type 'sequence-type))
 
 ; Check if an element is a parallel composition.
-(define par?
-  (is-element-of-type 'par-type))
+(define parallel?
+  (is-element-of-type 'parallel-type))
+
+; Recursively check if a list of elements (or an element) are music elements
+(define (music-elements? element)
+  #t)
 
 ; Accessor functions
 (define (get-value key element)
@@ -172,9 +176,11 @@
             
 ; Constructor functions. This collection of functions is used to create the different music elements.
 ; Create a pause element. Outputs an error if the duration is invalid
-(define (pause! duration)
-  (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
-        (else error("Invalid arguments passed to pause element."))))
+(define (pause! length)
+  (let ((duration (get-duration-from-length length)))
+        (cond ((duration? duration)
+               (pair-up '(type duration) (list 'pause-type duration)))
+        (else error("Invalid arguments passed to pause element.")))))
 
 ; Creates a note element. Performs various Check to validate that the arguments
 ; Two internal values (duration and pitch) are calculated before creating the note
@@ -187,7 +193,22 @@
            (pair-up '(type pitch instrument duration) (list 'note-type pitch instrument duration)))
           (else error("Invalid arguments passed to note element.")))))
 
-(define pause (pause! 10))
+; The approach to creating sequences and parallel compositions is similar
+; In both cases, we wish to verify that the inner elements are all music elements
+(define (composition! type . elements)
+  (if (music-elements? elements)
+      (pair-up '(type elements) (list type elements))
+      (error("All elements of a composition must be music elements."))))
+
+; Creates a sequential composition element
+(define (sequence! . elements)
+  (composition! 'sequence-type elements))
+
+; Creates a parallel composition element
+(define (parallel! . elements)
+  (composition! 'parallel-type elements))
+
+(define pause (pause! 2/4))
 (pause? pause)
 
 (get-duration-from-length 1/4)
@@ -196,6 +217,8 @@
 (note? note)
 note
 
+(define sequence (sequence! (pause! 10) note pause))
+sequence
 ; notes to self
 ; calculate duration of par using max
 ; re-instrument and scale may use the higher order map function
