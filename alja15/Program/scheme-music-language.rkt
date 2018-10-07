@@ -2,7 +2,20 @@
 ; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>
 ; Study number: 20154059
 
-; Utility functions from exercise solutions
+; Useful association list functions
+; Add property to element
+(define (add-property key value element)
+  (cons (cons key value) element))
+
+; Get value from association list with specified key
+(define (get-value key element)
+  (cond ((list? element)
+         (let ((lookup (assoc key element)))
+           (cond ((pair? lookup)
+                  (pair-contents lookup))
+                 (else (error("Could not look up key from association list."))))))
+        (else (error("Element is not an association list.")))))
+
 ; Written by Kurt Nørmark (TODO: Ask if allowed)
 (define (pair-up key-list value-list)
   (if (or (null? key-list) (null? value-list))
@@ -151,22 +164,46 @@
 (define sequence?
   (is-element-of-type 'sequence-type))
 
-; Check if an element is a parallel composition.
+; Check if an element is a parallel composition
 (define parallel?
   (is-element-of-type 'parallel-type))
 
+; Check if an element is a composition type
+(define (composition? element)
+  (or (sequence? element)
+      (parallel? element)))
+
+; Check if a single element is a music element
+(define (music-element? element)
+  (or (note? element)
+      (pause? element)
+      (sequence? element)
+      (parallel? element)))
+
 ; Recursively check if a list of elements (or an element) are music elements
-(define (music-elements? element)
-  #t)
+(define (music-elements? elements)
+  (cond ((null? elements) #t) ; The empty list of elements is a valid
+        ((pair? elements) (and (music-element? (car elements))
+                               (music-elements? (cdr elements))))
+        (else #f)))
+
+; Utility functions for music elements
+
+; Setters for existing elements
+; Update the instrument of a music element
+(define (set-instrument instrument element)
+  (cond ((note? element) (add-property 'instrument instrument element))
+        ((pause? element) element)
+        ((composition? element)
+         (add-property 'elements (map (lambda (e) (set-instrument instrument e)) (get-elements element)) element))
+        (else error("Not a music element."))))
 
 ; Accessor functions
-(define (get-value key element)
-  (cond ((list? element)
-         (let ((lookup (assoc key element)))
-           (cond ((pair? lookup)
-                  (pair-contents lookup))
-                 (else (error("Could not look up key from association list."))))))
-        (else (error("Element is not an association list.")))))
+; Gets the elements from a composition element
+(define (get-elements element)
+  (if (composition? element)
+      (get-value 'elements element)
+      (error("Cannot get elements from non-composition type."))))
 
 ; Gets the duration from an element, given that is it either a pause or a note
 (define (get-duration element)
@@ -195,7 +232,7 @@
 
 ; The approach to creating sequences and parallel compositions is similar
 ; In both cases, we wish to verify that the inner elements are all music elements
-(define (composition! type . elements)
+(define (composition! type elements)
   (if (music-elements? elements)
       (pair-up '(type elements) (list type elements))
       (error("All elements of a composition must be music elements."))))
@@ -208,17 +245,14 @@
 (define (parallel! . elements)
   (composition! 'parallel-type elements))
 
-(define pause (pause! 2/4))
-(pause? pause)
-
-(get-duration-from-length 1/4)
-
-(define note (note! 'A 4 'guitar 8))
-(note? note)
-note
-
-(define sequence (sequence! (pause! 10) note pause))
-sequence
 ; notes to self
 ; calculate duration of par using max
 ; re-instrument and scale may use the higher order map function
+
+(define noteC (note! 'C# 4 'guitar 1/4))
+(define noteB (note! 'B 2 'piano 3/4))
+(define pause (pause! 2/4))
+
+(define sequence (sequence! noteB pause noteC))
+(define parallel (parallel! sequence sequence noteB))
+(parallel? (set-instrument 'helicopter parallel))
