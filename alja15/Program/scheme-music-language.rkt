@@ -26,11 +26,22 @@
 (define (note-abs-time-with-duration abs-time channel note-number velocity duration)
   (cons 'note-abs-time-with-duration (list abs-time channel note-number velocity duration)))
 
-; One of the higher order functions provided on Moodle
+; The accumulate higher order function is provided on Moodle
 (define (accumulate f init lst)
   (if (null? lst)
       init
       (f (car lst) (accumulate f init (cdr lst)))))
+
+; A higher order function which counts how many elements satisfy a predicate
+(define (count pred lst)
+  (count-help pred lst 0))
+
+(define (count-help pred lst count)
+  (cond ((null? lst) count)
+        ((pred (car lst)) 
+           (count-help pred (cdr lst) (+ count 1)))
+        (else 
+           (count-help pred (cdr lst) count))))
 
 ; Music theory
 (define beats-per-minute 100)
@@ -205,14 +216,14 @@
             
 ; Constructor functions. This collection of functions is used to create the different music elements
 ; Create a pause element. Outputs an error if the duration is invalid
-(define (pause! length)
+(define (pause length)
   (let ((duration (get-duration-from-length length)))
         (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
         (else error("Invalid arguments passed to pause element.")))))
 
 ; Creates a note element. Performs various Check to validate that the arguments
 ; Two internal values (duration and pitch) are calculated before creating the note
-(define (note! note-name octave instrument length)
+(define (note note-name octave instrument length)
   (let* ((pitch (get-pitch-from-note-octave note-name octave))
          (duration (get-duration-from-length length)))
     (cond ((and (duration? duration) (instrument? instrument) (pitch? pitch))
@@ -228,12 +239,12 @@
 
 ; Creates a sequential composition element
 ; Accepts a variable number of parameters which are the elements of the composition
-(define (sequence! . elements)
+(define (sequence . elements)
   (composition! 'sequence-type elements))
 
 ; Creates a parallel composition element
 ; Accepts a variable number of parameters which are the elements of the composition
-(define (parallel! . elements)
+(define (parallel . elements)
   (composition! 'parallel-type elements))
 
 ; Utility functions for music elements
@@ -263,9 +274,7 @@
   (cond ((pause? element) element)
         ((note? element)
          (let ((new-pitch (+ offset (get-pitch element))))
-           (if (pitch? new-pitch)
-               (add-property 'pitch new-pitch element)
-               (error("Transposition would result in an illegal pitch.")))))
+           (if (pitch? new-pitch) (add-property 'pitch new-pitch element) (error("Transposition would result in an illegal pitch.")))))
          ((composition? element) (add-property 'members (map (lambda (e) (transpose offset e)) (get-elements element)) element))
          (else error("Cannot transpose a non-music element."))))
 
@@ -289,7 +298,6 @@
       (let ((head (car elements)))
         (append (linearize-helper head offset) (linearize-parallel (cdr elements) offset)))))
 
-; This is why linearization is delegated to other helper functions
 ; Note that the composition helpers handle updating offsets. Pauses "return" nothing, they serve only to update the offsets
 (define (linearize-helper element offset)
   (cond ((note? element) (linearize-note element offset))
@@ -297,16 +305,57 @@
         ((parallel? element) (linearize-parallel (get-elements element) offset))
         ((pause? element) '())))
 
-(define noteC (note! 'F 8 'piano 1/4))
-(define noteB (note! 'B 2 'organ 3/4))
-(define noteA (note! 'A# 4 'trumpet 1/2))
-(define noteD (note! 'A# 8 'violin 1/2))
-(define pause (pause! 2/4))
-(define annoying (sequence! noteA noteD noteA noteA noteD noteA noteA noteD noteA noteA noteD noteA))
-(define sequence (sequence! noteB noteC))
-(define sequence2 (sequence! noteC pause noteB))
+; My method for calculating degree of polyphony requires that the linearized list is sorted
+(define abs-note-start cadr)
+(define abs-note-duration (lambda (e) (cadr (cddddr e))))
+(define (sort-by-start list)
+  (sort list < #:key (lambda (abs-note) (abs-note-start abs-note))))
 
-(define longer-sequence (sequence! sequence noteB noteC pause noteC pause pause noteB noteB pause noteB))
-(define much-longer (sequence! longer-sequence longer-sequence longer-sequence))
+; Calculate degree of polyphony
+; I re-use the linearize function in order to get the start time and duration of notes
+(define (degree-of-polyphony element)
+  (if (music-element? element)
+    (let ((linearized-sorted (sort-by-start (linearize element))))
+      (apply max (polyphony-helper linearized-sorted)))
+    (error("Cannot determine degree of polyphony for a non-music element."))))
 
-(linearize (sequence! (parallel! annoying much-longer) pause pause pause noteA))
+; Higher order function for determining overlap with some other element
+(define (overlap-pred element)
+  (let* ((own-start (abs-note-start element))
+         (own-end (+ (abs-note-duration element) own-start)))
+    (lambda (other) (let* ((other-start (abs-note-start other))
+                           (other-end (+ (abs-note-duration other) other-start)))
+                      (and (>= other-start own-start) (< other-start own-end))))))
+
+; The basic principle is that for each element (head), we check if the remainder of elements overlap with this element. This is NOT an efficient solution, but it does the job
+(define (polyphony-helper elements)
+  (if (null? elements) (list 0) ; If the list is empty, the degree of polyphony is 0
+      (let* ((head (car elements))
+             (remainder (cdr elements)))
+        (append (polyphony-helper remainder)
+                (list (count (overlap-pred head) elements)))))) ; Overlap checking includes checking whether a note overlaps with itself
+
+; Having implemeneted degree of polyphony, determining whether a music element is monotonic is trivial
+(define (monotonic? element)
+  (if (music-element? element) (eq? (degree-of-polyphony element) 1)
+      (error("Cannot determine whether a non-music element is monotonic."))))
+ 
+(define noteC (note 'F 8 'piano 1/4))
+(define noteB (note 'B 2 'organ 3/4))
+(define noteA (note 'A# 4 'trumpet 1/2))
+(define noteD (note 'A# 8 'violin 1/2))
+(define pause1 (pause 2/4))
+(define annoying (sequence noteA noteD noteA noteA noteD noteA noteA noteD noteA noteA noteD noteA))
+(define sequence1 (sequence noteB noteC))
+(define sequence2 (sequence noteC pause1 noteB))
+(define linearized (linearize sequence1))
+(define pauses (sequence noteB noteB))
+linearized
+(define par (parallel sequence1 sequence2 sequence1 pauses))
+
+(degree-of-polyphony par)
+(degree-of-polyphony sequence1)
+(define longer-sequence (sequence sequence1 noteB noteC pause1 noteC pause1 pause1 noteB noteB pause1 noteB))
+(define much-longer (sequence longer-sequence longer-sequence longer-sequence))
+
+(linearize par)
