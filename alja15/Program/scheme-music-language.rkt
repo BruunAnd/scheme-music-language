@@ -92,33 +92,18 @@
         (+ base (* 12 octave)))
       (error ("Invalid note name or octave provided when getting pitch."))))
 
-; An inclusive check for whether an integer is in some range
-(define (is-int-in-range value lower upper)
-  (and (integer? value)
-       (>= value lower)
-       (<= value upper)))
+; Various validity checks
+(define (is-int-in-range value lower upper) (and (integer? value) (>= value lower) (<= value upper)))
+(define (duration? duration) (and (integer? duration) (>= duration 0)))
+(define (pitch? value) (is-int-in-range value 0 127))
+(define (octave? value) (is-int-in-range value 1 8))
 
-; Check if a duration is valid
-(define (duration? duration)
-  (and (integer? duration)
-       (>= duration 0)))
-
-; Check if a pitch value is in the valid range
-(define (pitch? value)
-  (is-int-in-range value 0 127))
-
-; Check if an octave value is in the valid range
-(define (octave? value)
-  (is-int-in-range value 1 8))
-
+; Type checks
 (define (note-type? type) (eq? type 'note))
 (define (pause-type? type) (eq? type 'pause))
 (define (sequence-type? type) (eq? type 'sequential))
 (define (parallel-type? type) (eq? type 'par)) ; Check if a type is a parallel composition type
-
-; Check if a type is a music type
-(define (music-type? type)
-  (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
+(define (music-type? type) (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
 
 ; Helper function which returns a function for checking whether some
 ; element is of a type. Returns #f if the element is not a list, or
@@ -233,8 +218,7 @@
          (else error("Cannot transpose a non-music element."))))
 
 ; Linearize a representation, starting at offset 0
-(define (linearize element)
-  (linearize-helper element 0))
+(define (linearize element) (linearize-helper element 0))
 
 ; In our base case we have a note and we use the constructor provided by KN to make an absolute note
 (define (linearize-note element offset)
@@ -267,7 +251,7 @@
 
 ; Calculate degree of polyphony
 ; I re-use the linearize function in order to get the start time and duration of notes
-(define (degree-of-polyphony element)
+(define (polyphony-degree element)
   (if (music-element? element)
     (let ((linearized-sorted (sort-by-start (linearize element))))
       (apply max (polyphony-helper linearized-sorted))) ; Since polyphony-helper returns a list of polyphonies, we need to apply max
@@ -291,5 +275,5 @@
 
 ; Having implemeneted degree of polyphony, determining whether a music element is monotonic is trivial
 (define (monotonic? element)
-  (if (music-element? element) (eq? (degree-of-polyphony element) 1)
+  (if (music-element? element) (eq? (polyphony-degree element) 1)
       (error("Cannot determine whether a non-music element is monotonic."))))
