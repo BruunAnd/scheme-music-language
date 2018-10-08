@@ -111,31 +111,14 @@
 (define (octave? value)
   (is-int-in-range value 1 8))
 
-; Check if a type is a note type
-(define (note-type? type)
-  (eq? type 'note))
-
-; Check if a type is a pause type
-(define (pause-type? type)
-  (eq? type 'pause))
-
-; Check if a type is a sequence type
-(define (sequence-type? type)
-  (eq? type 'sequential))
-
-; Check if a type is a parallel composition type
-(define (parallel-type? type)
-  (eq? type 'par))
+(define (note-type? type) (eq? type 'note))
+(define (pause-type? type) (eq? type 'pause))
+(define (sequence-type? type) (eq? type 'sequential))
+(define (parallel-type? type) (eq? type 'par)) ; Check if a type is a parallel composition type
 
 ; Check if a type is a music type
 (define (music-type? type)
-  (or (note-type? type)
-      (pause-type? type)
-      (sequence-type? type)
-      (parallel-type? type)))
-
-; All music elements in my music language are association lists
-; As such, I can check if some list is a music element by checking its type.
+  (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
 
 ; Helper function which returns a function for checking whether some
 ; element is of a type. Returns #f if the element is not a list, or
@@ -145,47 +128,24 @@
   (lambda (element)
     (cond ((list? element)
            (let ((lookup (assoc 'type element)))
-             (cond ((pair? lookup)
-                    (eq? (cdr lookup) type))
+             (cond ((pair? lookup) (eq? (cdr lookup) type))
                    (else #f))))
           (else #f))))
 
-; Check if an element is a note.
-(define note?
-  (is-element-of-type 'note-type))
-
-; Check if an element is a pause.
-(define pause?
-  (is-element-of-type 'pause-type))
-
-; Check if an element is a sequence.
-(define sequence?
-  (is-element-of-type 'sequence-type))
-
-; Check if an element is a parallel composition
-(define parallel?
-  (is-element-of-type 'parallel-type))
-
-; Check if an element is a composition type
-(define (composition? element)
-  (or (sequence? element)
-      (parallel? element)))
-
-; Check if a single element is a music element
-(define (music-element? element)
-  (or (note? element)
-      (pause? element)
-      (sequence? element)
-      (parallel? element)))
+; Functins to check the type of a single music element
+(define note? (is-element-of-type 'note-type))
+(define pause? (is-element-of-type 'pause-type))
+(define sequence? (is-element-of-type 'sequence-type))
+(define parallel? (is-element-of-type 'parallel-type))
+(define (composition? element) (or (sequence? element) (parallel? element)))
+(define (music-element? element) (or (note? element) (pause? element) (sequence? element) (parallel? element)))
 
 ; Recursively check if a list of elements (or an element) are music elements
 (define (music-elements? elements)
   (cond ((null? elements) #t) ; The empty list of elements is a valid
-        ((pair? elements) (and (music-element? (car elements))
-                               (music-elements? (cdr elements))))
+        ((pair? elements) (and (music-element? (car elements)) (music-elements? (cdr elements))))
         (else #f)))
 
-; Accessor functions
 ; Gets the instrument from a note element
 (define (get-instrument element)
   (cond ((note? element) (get-value 'instrument element))
@@ -232,20 +192,14 @@
 
 ; The approach to creating sequences and parallel compositions is similar
 ; In both cases, we wish to verify that the inner elements are all music elements
-(define (composition! type elements)
+(define (composition type elements)
   (if (music-elements? elements)
       (pair-up '(type elements) (list type elements))
       (error("All elements of a composition must be music elements."))))
 
-; Creates a sequential composition element
-; Accepts a variable number of parameters which are the elements of the composition
-(define (sequence . elements)
-  (composition! 'sequence-type elements))
-
-; Creates a parallel composition element
-; Accepts a variable number of parameters which are the elements of the composition
-(define (parallel . elements)
-  (composition! 'parallel-type elements))
+; Both accepts a variable number of parameters which are the elements of the composition
+(define (parallel . elements) (composition 'parallel-type elements))
+(define (sequence . elements) (composition 'sequence-type elements))
 
 ; Utility functions for music elements
 ; Update the instrument of a music element
@@ -316,15 +270,15 @@
 (define (degree-of-polyphony element)
   (if (music-element? element)
     (let ((linearized-sorted (sort-by-start (linearize element))))
-      (apply max (polyphony-helper linearized-sorted)))
+      (apply max (polyphony-helper linearized-sorted))) ; Since polyphony-helper returns a list of polyphonies, we need to apply max
     (error("Cannot determine degree of polyphony for a non-music element."))))
 
 ; Higher order function for determining overlap with some other element
-(define (overlap-pred element)
+(define (overlap? element)
   (let* ((own-start (abs-note-start element))
          (own-end (+ (abs-note-duration element) own-start)))
     (lambda (other) (let* ((other-start (abs-note-start other))
-                           (other-end (+ (abs-note-duration other) other-start)))
+                           (other-end (+ (abs-note-duration other) other-start))) ; Do we need this?
                       (and (>= other-start own-start) (< other-start own-end))))))
 
 ; The basic principle is that for each element (head), we check if the remainder of elements overlap with this element. This is NOT an efficient solution, but it does the job
@@ -333,29 +287,9 @@
       (let* ((head (car elements))
              (remainder (cdr elements)))
         (append (polyphony-helper remainder)
-                (list (count (overlap-pred head) elements)))))) ; Overlap checking includes checking whether a note overlaps with itself
+                (list (count (overlap? head) elements)))))) ; Overlap checking includes checking whether a note overlaps with itself
 
 ; Having implemeneted degree of polyphony, determining whether a music element is monotonic is trivial
 (define (monotonic? element)
   (if (music-element? element) (eq? (degree-of-polyphony element) 1)
       (error("Cannot determine whether a non-music element is monotonic."))))
- 
-(define noteC (note 'F 8 'piano 1/4))
-(define noteB (note 'B 2 'organ 3/4))
-(define noteA (note 'A# 4 'trumpet 1/2))
-(define noteD (note 'A# 8 'violin 1/2))
-(define pause1 (pause 2/4))
-(define annoying (sequence noteA noteD noteA noteA noteD noteA noteA noteD noteA noteA noteD noteA))
-(define sequence1 (sequence noteB noteC))
-(define sequence2 (sequence noteC pause1 noteB))
-(define linearized (linearize sequence1))
-(define pauses (sequence noteB noteB))
-linearized
-(define par (parallel sequence1 sequence2 sequence1 pauses))
-
-(degree-of-polyphony par)
-(degree-of-polyphony sequence1)
-(define longer-sequence (sequence sequence1 noteB noteC pause1 noteC pause1 pause1 noteB noteB pause1 noteB))
-(define much-longer (sequence longer-sequence longer-sequence longer-sequence))
-
-(linearize par)
