@@ -16,14 +16,6 @@
                    (else (error("Could not look up key from association list."))))))
           (else (error("Element is not an association list.")))))
 
-  ; Written by KN as an exercise solution (TODO: Ask if allowed)
-  (define (pair-up key-list value-list)
-    (if (or (null? key-list) (null? value-list))
-        '()
-        (cons
-         (cons (car key-list) (car value-list))
-         (pair-up (cdr key-list) (cdr value-list)))))
-
   ; Constructor for low level representation provided by KN
   (define (note-abs-time-with-duration abs-time channel note-number velocity duration)
     (cons 'note-abs-time-with-duration (list abs-time channel note-number velocity duration)))
@@ -165,7 +157,7 @@
   ; Create a pause element. Outputs an error if the duration is invalid
   (define (pause length)
     (let ((duration (get-duration-from-length length)))
-          (cond ((duration? duration) (pair-up '(type duration) (list 'pause-type duration)))
+          (cond ((duration? duration) (list (cons 'type 'pause-type) (cons 'duration duration)))
           (else error("Invalid arguments passed to pause element.")))))
 
   ; Creates a note element. Performs various Check to validate that the arguments
@@ -174,14 +166,14 @@
     (let* ((pitch (get-pitch-from-note-octave note-name octave))
            (duration (get-duration-from-length length)))
       (cond ((and (duration? duration) (instrument? instrument) (pitch? pitch))
-             (pair-up '(type pitch instrument duration) (list 'note-type pitch instrument duration)))
+             (list (cons 'type 'note-type) (cons 'pitch pitch) (cons 'instrument instrument) (cons 'duration duration)))
             (else error("Invalid arguments passed to note element.")))))
 
   ; The approach to creating sequences and parallel compositions is similar
   ; In both cases, we wish to verify that the inner elements are all music elements
   (define (composition type elements)
     (if (music-elements? elements)
-        (pair-up '(type elements) (list type elements))
+        (list (cons 'type type) (cons 'elements elements))
         (error("All elements of a composition must be music elements."))))
 
   ; Both accepts a variable number of parameters which are the elements of the composition
