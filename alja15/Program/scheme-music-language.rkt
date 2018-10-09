@@ -1,7 +1,7 @@
 #lang racket
 ; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>, study number: 20154059
 
-(module scheme-music-language-base racket
+(module music-language racket
   (provide monophonic? polyphony-degree note pause parallel sequence)
   
   ; Add property to element

@@ -5,3 +5,5 @@
 *.scm~
 *.scm#*
 .#*.scm
+
+alja15/Program/compiled/
