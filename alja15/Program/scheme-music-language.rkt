@@ -1,7 +1,7 @@
-#lang racket
 ; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>, study number: 20154059
 
 (module music-language racket
+  (require "pp-standard-functions-racket.scm")
   (provide monophonic? polyphony-degree note pause parallel sequence)
   
   ; Add property to element
@@ -19,12 +19,6 @@
   ; Constructor for low level representation provided by KN
   (define (note-abs-time-with-duration abs-time channel note-number velocity duration)
     (cons 'note-abs-time-with-duration (list abs-time channel note-number velocity duration)))
-
-  ; The accumulate higher order function is provided on Moodle
-  (define (accumulate f init lst)
-    (if (null? lst)
-        init
-        (f (car lst) (accumulate f init (cdr lst)))))
 
   ; A higher order function which counts how many elements satisfy a predicate
   (define (count pred lst)
@@ -149,7 +143,7 @@
     (cond ((or (pause? element) (note? element)) (get-value 'duration element))
           ((composition? element)
            (let ((mapped-elements (map (lambda (e) (get-duration e)) (get-elements element))))
-             (cond ((sequence? element) (accumulate + 0 mapped-elements))
+             (cond ((sequence? element) (accumulate-right + 0 mapped-elements))
                    ((parallel? element) (apply max mapped-elements)))))
           (else (error("Cannot get duration from a non-music element.")))))
               
@@ -259,7 +253,7 @@
                              (other-end (+ (abs-note-duration other) other-start))) ; Do we need this?
                         (and (>= other-start own-start) (< other-start own-end))))))
 
-  ; The basic principle is that for each element (head), we check if the remainder of elements overlap with this element. This is NOT an efficient solution, but it does the job
+  ; The basic principle is that for each element (head), we check if the remainder of elements overlap with this element. NOT an efficient solution, but it does the job
   (define (polyphony-helper elements)
     (if (null? elements) (list 0) ; If the list is empty, the degree of polyphony is 0
         (let* ((head (car elements))
