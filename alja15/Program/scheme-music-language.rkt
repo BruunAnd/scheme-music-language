@@ -7,14 +7,14 @@
   ; Add property to element
   (define (add-property key value element)
     (cons (cons key value) element))
-
+    
   ; Get value from association list with specified key
-  (define (get-value key element)
-    (cond ((list? element)
-           (let ((lookup (assoc key element)))
+  (define (get-value key assoc-list)
+    (cond ((list? assoc-list)
+           (let ((lookup (assoc key assoc-list)))
              (cond ((pair? lookup) (cdr lookup))
-                   (else (error("Could not look up key from association list."))))))
-          (else (error("Element is not an association list.")))))
+                   (else (error "Could not look up key from association list.")))))
+          (else (error "Element is not an association list."))))
 
   ; Constructor for low level representation provided by KN
   (define (note-abs-time-with-duration abs-time channel note-number velocity duration)
@@ -57,18 +57,17 @@
   (define (get-instrument-channel instrument)
     (if (instrument? instrument)
         (cdr (assoc instrument instrument-channels))
-        (error("Cannot get channel from something which is not an instrument."))))
+        (error "Cannot get channel from something which is not an instrument.")))
 
   ; Get the base pitch from a note name
   (define (note-name-base note-name)
     (if (note-name? note-name)
         (get-value note-name note-names)
-        (error ("Cannot get note name base from something which is not a note name."))))
+        (error "Cannot get note name base from something which is not a note name.")))
 
   ; Get the duration in actual time units given rational length
   ; The formula is based on a post from Music StackExchange
   ; UnitsPerSecond * Length * 60 * 4 / BPM
-  ; I am rounding the number to be on the safe side
   (define (get-duration-from-length length)
     (if (rational? length)
         (* (* length (* 60 (/ 4 beats-per-minute))) time-units-per-second)
@@ -94,13 +93,13 @@
   (define (parallel-type? type) (eq? type 'par)) ; Check if a type is a parallel composition type
   (define (music-type? type) (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
 
-  ; Helper function which returns a function for checking whether some
-  ; element is of a type. Returns #f if the element is not a list, or
-  ; if assq returns something that is not a pair.
-  ; TODO: Use some form of has-key and get-value-value instead
+  ; Get the type of an element
+  ; TODO: Use in is-element-of-type
   (define (get-type element)
     (get-value 'type element))
   
+  ; Helper function which returns a function for checking whether someelement is of a type. Returns #f if the element is not a list, or
+  ; if assq returns something that is not a pair.
   (define (is-element-of-type type)
     (lambda (element)
       (cond ((list? element)
@@ -126,17 +125,17 @@
   ; Gets the instrument from a note element
   (define (get-instrument element)
     (cond ((note? element) (get-value 'instrument element))
-          (else (error("Cannot get instrument from something that is not a note.")))))
+          (else (error "Cannot get instrument from something that is not a note."))))
 
   ; Gets the elements from a composition element
   (define (get-elements element)
     (cond ((composition? element) (get-value 'elements element))
-          (else error("Cannot get elements from non-composition type."))))
+          (else (error "Cannot get elements from non-composition type."))))
 
   ; Gets the pitch from a note element
   (define (get-pitch element)
     (cond ((note? element) (get-value 'pitch element))
-          (else (error("Cannot get pitch from something that is not a note.")))))
+          (else (error "Cannot get pitch from something that is not a note."))))
 
   ; Gets the duration from an element
   ; For notes and pauses, we simply get the duration from the duration key
@@ -149,14 +148,14 @@
            (let ((mapped-elements (map (lambda (e) (get-duration e)) (get-elements element))))
              (cond ((sequence? element) (accumulate-right + 0 mapped-elements))
                    ((parallel? element) (apply max mapped-elements)))))
-          (else (error("Cannot get duration from a non-music element.")))))
+          (else (error "Cannot get duration from a non-music element."))))
               
   ; Constructor functions. This collection of functions is used to create the different music elements
   ; Create a pause element. Outputs an error if the duration is invalid
   (define (pause length)
     (let ((duration (get-duration-from-length length)))
           (cond ((duration? duration) (list (cons 'type 'pause-type) (cons 'duration duration)))
-          (else error("Invalid arguments passed to pause element.")))))
+          (else (error "Invalid arguments passed to pause element.")))))
 
   ; Creates a note element. Performs various Check to validate that the arguments
   ; Two internal values (duration and pitch) are calculated before creating the note
@@ -165,14 +164,14 @@
            (duration (get-duration-from-length length)))
       (cond ((and (duration? duration) (instrument? instrument) (pitch? pitch))
              (list (cons 'type 'note-type) (cons 'pitch pitch) (cons 'instrument instrument) (cons 'duration duration)))
-            (else error("Invalid arguments passed to note element.")))))
+            (else (error "Invalid arguments passed to note element.")))))
 
   ; The approach to creating sequences and parallel compositions is similar
   ; In both cases, we wish to verify that the inner elements are all music elements
   (define (composition type elements)
     (if (music-elements? elements)
         (list (cons 'type type) (cons 'elements elements))
-        (error("All elements of a composition must be music elements."))))
+        (error "All elements of a composition must be music elements.")))
 
   ; Both accepts a variable number of parameters which are the elements of the composition
   (define (parallel . elements) (composition 'parallel-type elements))
@@ -187,7 +186,7 @@
     (cond ((note? element) (add-property 'instrument instrument element))
           ((pause? element) element)
           ((composition? element) (composition (get-type element) (map (lambda (e) (set-instrument instrument e)) (get-elements element))))
-          (else error("Cannot set instrument of a non-music element."))))
+          (else (error "Cannot set instrument of a non-music element."))))
 
   ; Scale a music element with some factor
   ; For notes and pauses, return new elements where the duration has been multiplied
@@ -196,7 +195,7 @@
   (define (scale factor element)
     (cond ((or (note? element) (pause? element)) (add-property 'duration (exact-round (* factor (get-duration element))) element))
           ((composition? element) (composition (get-type element) (map (lambda (e) (scale factor e)) (get-elements element))))
-          (else error("Cannot scale a non-music element."))))
+          (else (error "Cannot scale a non-music element."))))
 
   ; Transpose a music element with some value
   ; No need to do anything about pauses
@@ -206,9 +205,9 @@
     (cond ((pause? element) element)
           ((note? element)
            (let ((new-pitch (+ offset (get-pitch element))))
-             (if (pitch? new-pitch) (add-property 'pitch new-pitch element) (error("Transposition would result in an illegal pitch.")))))
+             (if (pitch? new-pitch) (add-property 'pitch new-pitch element) (error "Transposition would result in an illegal pitch."))))
            ((composition? element) (composition (get-type element) (map (lambda (e) (transpose offset e)) (get-elements element))))
-           (else error("Cannot transpose a non-music element."))))
+           (else (error "Cannot transpose a non-music element."))))
 
   ; Linearize a representation, starting at offset 0
   ; I sort it to get a nice output and because it's needed by my degree of polyphony calculator
@@ -248,7 +247,7 @@
     (if (music-element? element)
       (let ((linearized (sort-by-end (linearize element))))
         (apply max (polyphony-helper linearized))) ; Since polyphony-helper returns a list of polyphonies, we need to apply max to get the highest degree
-      (error("Cannot determine degree of polyphony for a non-music element."))))
+      (error "Cannot determine degree of polyphony for a non-music element.")))
 
   ; Higher order function for determining overlap with some other element
   (define (overlap? element)
@@ -269,5 +268,5 @@
   ; Having implemeneted degree of polyphony, determining whether a music element is monophonic is trivial
   (define (monophonic? element)
     (if (music-element? element) (eq? (polyphony-degree element) 1)
-        (error("Cannot determine whether a non-music element is monophonic."))))
+        (error "Cannot determine whether a non-music element is monophonic.")))
 )

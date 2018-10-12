@@ -81,3 +81,6 @@ note-fs
 
 (display "What is the duration of the canon?\n")
 (get-duration canon)
+
+(display "What is the degree of polyphony of two parallel canons?\n")
+(polyphony-degree (parallel canon canon))
