@@ -1,3 +1,4 @@
+; Author: Anders Langballe Jakobsen <alja15@student.aau.dk>, study number: 20154059
 #lang racket
 
 (require "scheme-music-language.rkt")
@@ -64,15 +65,14 @@ note-fs
 (display "Canon example\n")
 (define inst 'piano)
 (define a-canon-sequence
-  (sequence (note 'C 4 inst 1/3) (note 'C 2 inst 1/3) (note 'C 3 inst 1/3) (note 'C 4 inst 1/2) (note 'C 4 inst 1/2)
-            (note 'C 4 inst 1/4) (note 'C 3 inst 1/2) (note 'C 4 inst 1/2) (note 'C 3 inst 1/3) (note 'C 4 inst 1)))
+  (sequence (note 'C 4 inst 1/8) (note 'F 1 inst 1/8) (note 'F 0 inst 1/8) (note 'F 1 inst 1/8) (note 'E 0 inst 1/8)
+            (note 'F 2 inst 1/8) (note 'E 3 inst 1/8) (note 'E 2 inst 1/8) (note 'E 3 inst 1/8) (note 'C 2 inst 1/8)))
 
 (define canon
   (parallel a-canon-sequence
-            (sequence (pause 2) (transpose 10 a-canon-sequence))
-            (sequence (pause 6) (transpose 20 a-canon-sequence))
-            (sequence (pause 10) (transpose 30 a-canon-sequence))
-            (sequence (pause 14) (transpose 40 a-canon-sequence))))
+            (sequence (pause 6/4) (transpose 10 a-canon-sequence))
+            (sequence (pause 10/4) (transpose 20 a-canon-sequence))
+            (sequence (pause 14/4) (transpose -10 a-canon-sequence))))
 
 (linearize canon)
 
@@ -84,3 +84,9 @@ note-fs
 
 (display "What is the degree of polyphony of two parallel canons?\n")
 (polyphony-degree (parallel canon canon))
+
+(define parse-test (parallel (note 'C 4 inst 1/2)
+                             (sequence (note 'G 4 inst 1/8) (note 'D 4 inst 1/8))))
+(polyphony-degree parse-test)
+
+

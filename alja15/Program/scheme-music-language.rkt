@@ -2,11 +2,12 @@
 
 (module music-language racket
   (require "pp-standard-functions-racket.scm")
-  (provide monophonic? polyphony-degree note pause parallel sequence transpose set-instrument get-duration scale linearize)
+  (provide monophonic? polyphony-degree note pause parallel sequence transpose set-instrument get-duration scale linearize get-pitch-from-note-octave
+           note? pause? sequence? composition? parallel?)
   
-  ; Add property to element
-  (define (add-property key value element)
-    (cons (cons key value) element))
+  ; Add property to association list element
+  (define (add-property key value alist)
+    (cons (cons key value) alist))
     
   ; Get value from association list with specified key
   (define (get-value key assoc-list)
@@ -20,7 +21,7 @@
   (define (note-abs-time-with-duration abs-time channel note-number velocity duration)
     (cons 'note-abs-time-with-duration (list abs-time channel note-number velocity duration)))
 
-  ; A higher order function which counts how many elements satisfy a predicate
+  ; A higher order function which counts how many elements satisfy a predicate (used in calculating degree of polyphony)
   (define (count pred lst)
     (count-help pred lst 0))
 
@@ -31,16 +32,15 @@
           (else 
              (count-help pred (cdr lst) count))))
 
-  ; Music theory
-  (define beats-per-minute 60)
+  ; Music theory definitions
+  (define beats-per-minute 75)
   (define time-units-per-second 960)
 
-  ; We are dealing with a number of instruments which have a MIDI channel associated with them.
+  ; I are dealing with a number of instruments which have a MIDI channel associated with them.
   ; This definition is an association list which pairs instruments with these channels
   (define instrument-channels '((piano . 1) (organ . 2) (guitar . 3) (violin . 4) (flute . 5) (trumpet . 6) (helicopter . 7) (telephone . 8)))
 
-  ; We are also dealing with a number of note names. These all have some base value which
-  ; is used when calculating the pitch of a note
+  ; I are also dealing with a number of note names. These all have some base value which is used when calculating the pitch of a note
   (define note-names '((C . 0) (C# . 1) (D . 2) (D# . 3) (E . 4) (F . 5) (F# . 6) (G . 7) (G# . 8) (A . 9) (A# . 10) (B . 11)))
 
   ; Check if a note name is valid
@@ -65,36 +65,50 @@
         (get-value note-name note-names)
         (error "Cannot get note name base from something which is not a note name.")))
 
-  ; Get the duration in actual time units given rational length
-  ; The formula is based on a post from Music StackExchange
-  ; UnitsPerSecond * Length * 60 * 4 / BPM
+  ; Get the duration in actual time units given rational length. In some cases the intermediate result is not an int, which is why is it rounded
   (define (get-duration-from-length length)
     (if (rational? length)
-        (* (* length (* 60 (/ 4 beats-per-minute))) time-units-per-second)
+        (exact-round (* (* length (* 60 (/ 4 beats-per-minute)))
+                        time-units-per-second))
         (error ("Length must be a rational number."))))
 
   ; Get pitch given a note name and octave
   (define (get-pitch-from-note-octave note-name octave)
     (if (and (note-name? note-name) (octave? octave))
         (let ((base (note-name-base note-name)))
-          (+ base (* 12 octave)))
+          (+ base (* 12 (+ 1 octave))))
         (error ("Invalid note name or octave provided when getting pitch."))))
 
   ; Various validity checks
-  (define (is-int-in-range value lower upper) (and (integer? value) (>= value lower) (<= value upper)))
-  (define (duration? duration) (and (integer? duration) (>= duration 0)))
-  (define (pitch? value) (is-int-in-range value 0 127))
-  (define (octave? value) (is-int-in-range value 1 8))
+  (define (is-int-in-range value lower upper)
+    (and (integer? value) (>= value lower) (<= value upper)))
+  
+  (define (duration? duration)
+    (and (integer? duration) (>= duration 0)))
+  
+  (define (pitch? value)
+    (is-int-in-range value 0 127))
+  
+  (define (octave? value)
+    (is-int-in-range value -1 9))
 
   ; Type checks
-  (define (note-type? type) (eq? type 'note))
-  (define (pause-type? type) (eq? type 'pause))
-  (define (sequence-type? type) (eq? type 'sequential))
-  (define (parallel-type? type) (eq? type 'par)) ; Check if a type is a parallel composition type
-  (define (music-type? type) (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
+  (define (note-type? type)
+    (eq? type 'note))
+  
+  (define (pause-type? type)
+    (eq? type 'pause))
+  
+  (define (sequence-type? type)
+    (eq? type 'sequential))
+  
+  (define (parallel-type? type)
+    (eq? type 'par))
+  
+  (define (music-type? type)
+    (or (note-type? type) (pause-type? type) (sequence-type? type) (parallel-type? type)))
 
   ; Get the type of an element
-  ; TODO: Use in is-element-of-type
   (define (get-type element)
     (get-value 'type element))
   
@@ -102,19 +116,31 @@
   ; if assq returns something that is not a pair.
   (define (is-element-of-type type)
     (lambda (element)
-      (cond ((list? element)
-             (let ((lookup (assoc 'type element)))
-               (cond ((pair? lookup) (eq? (cdr lookup) type))
-                     (else #f))))
-            (else #f))))
+      (if (list? element)
+          (let ((lookup (assoc 'type element)))
+            (if (pair? lookup)
+                (eq? (cdr lookup) type)
+                #f))
+          #f)))
 
-  ; Functins to check the type of a single music element
-  (define note? (is-element-of-type 'note-type))
-  (define pause? (is-element-of-type 'pause-type))
-  (define sequence? (is-element-of-type 'sequence-type))
-  (define parallel? (is-element-of-type 'parallel-type))
-  (define (composition? element) (or (sequence? element) (parallel? element)))
-  (define (music-element? element) (or (note? element) (pause? element) (sequence? element) (parallel? element)))
+  ; Functions to check the type of a single music element
+  (define note?
+    (is-element-of-type 'note-type))
+  
+  (define pause?
+    (is-element-of-type 'pause-type))
+  
+  (define sequence?
+    (is-element-of-type 'sequence-type))
+  
+  (define parallel?
+    (is-element-of-type 'parallel-type))
+  
+  (define (composition? element)
+    (or (sequence? element) (parallel? element)))
+  
+  (define (music-element? element)
+    (or (note? element) (pause? element) (sequence? element) (parallel? element)))
 
   ; Recursively check if a list of elements (or an element) are music elements
   (define (music-elements? elements)
@@ -124,13 +150,15 @@
 
   ; Gets the instrument from a note element
   (define (get-instrument element)
-    (cond ((note? element) (get-value 'instrument element))
-          (else (error "Cannot get instrument from something that is not a note."))))
+    (if (note? element)
+        (get-value 'instrument element)
+        (error "Cannot get instrument from something that is not a note.")))
 
   ; Gets the elements from a composition element
   (define (get-elements element)
-    (cond ((composition? element) (get-value 'elements element))
-          (else (error "Cannot get elements from non-composition type."))))
+    (if (composition? element)
+        (get-value 'elements element)
+        (error "Cannot get elements from non-composition type.")))
 
   ; Gets the pitch from a note element
   (define (get-pitch element)
@@ -138,44 +166,43 @@
           (else (error "Cannot get pitch from something that is not a note."))))
 
   ; Gets the duration from an element
-  ; For notes and pauses, we simply get the duration from the duration key
-  ; For sequential compositions, we use the higher-order function reduce on the elements of the sequence, which are first mapped to a list of durations
-  ; For parallel compositions, we apply the function max on the elements of a sequence
-  ; Because both compositions use them, I use let to bind mapped-elements
   (define (get-duration element)
-    (cond ((or (pause? element) (note? element)) (get-value 'duration element))
+    (cond ((or (pause? element) (note? element)) (get-value 'duration element)) ; Here I simply get the duration from the duration key
           ((composition? element)
-           (let ((mapped-elements (map (lambda (e) (get-duration e)) (get-elements element))))
-             (cond ((sequence? element) (accumulate-right + 0 mapped-elements))
-                   ((parallel? element) (apply max mapped-elements)))))
+           (let ((durations (map (lambda (e) (get-duration e)) (get-elements element)))) ; Elements are recursively mapped to their duration
+             (cond ((sequence? element) (accumulate-right + 0 durations)) ; The higher-order function accumulate is used on the mapped elements
+                   ((parallel? element) (apply max durations))))) ; The maximum duration of the parallel composition is the duration of the composition
           (else (error "Cannot get duration from a non-music element."))))
               
   ; Constructor functions. This collection of functions is used to create the different music elements
   ; Create a pause element. Outputs an error if the duration is invalid
   (define (pause length)
     (let ((duration (get-duration-from-length length)))
-          (cond ((duration? duration) (list (cons 'type 'pause-type) (cons 'duration duration)))
-          (else (error "Invalid arguments passed to pause element.")))))
+          (if (duration? duration)
+              (list (cons 'type 'pause-type) (cons 'duration duration))
+              (error "Invalid arguments passed to pause element."))))
 
   ; Creates a note element. Performs various Check to validate that the arguments
   ; Two internal values (duration and pitch) are calculated before creating the note
   (define (note note-name octave instrument length)
     (let* ((pitch (get-pitch-from-note-octave note-name octave))
            (duration (get-duration-from-length length)))
-      (cond ((and (duration? duration) (instrument? instrument) (pitch? pitch))
-             (list (cons 'type 'note-type) (cons 'pitch pitch) (cons 'instrument instrument) (cons 'duration duration)))
-            (else (error "Invalid arguments passed to note element.")))))
+      (if (and (duration? duration) (instrument? instrument) (pitch? pitch))
+          (list (cons 'type 'note-type) (cons 'pitch pitch) (cons 'instrument instrument) (cons 'duration duration))
+          (error "Invalid arguments passed to note element."))))
 
-  ; The approach to creating sequences and parallel compositions is similar
-  ; In both cases, we wish to verify that the inner elements are all music elements
+  ; The approach to creating sequences and parallel compositions is similar. In both cases, I wish to verify that the inner elements are all music elements
   (define (composition type elements)
     (if (music-elements? elements)
         (list (cons 'type type) (cons 'elements elements))
         (error "All elements of a composition must be music elements.")))
 
   ; Both accepts a variable number of parameters which are the elements of the composition
-  (define (parallel . elements) (composition 'parallel-type elements))
-  (define (sequence . elements) (composition 'sequence-type elements))
+  (define (parallel . elements)
+    (composition 'parallel-type elements))
+  
+  (define (sequence . elements)
+    (composition 'sequence-type elements))
 
   ; Utility functions for music elements
   ; Update the instrument of a music element
@@ -205,31 +232,37 @@
     (cond ((pause? element) element)
           ((note? element)
            (let ((new-pitch (+ offset (get-pitch element))))
-             (if (pitch? new-pitch) (add-property 'pitch new-pitch element) (error "Transposition would result in an illegal pitch."))))
+             (if (pitch? new-pitch)
+                 (add-property 'pitch new-pitch element)
+                 (error "Transposition would result in an illegal pitch."))))
            ((composition? element) (composition (get-type element) (map (lambda (e) (transpose offset e)) (get-elements element))))
            (else (error "Cannot transpose a non-music element."))))
 
   ; Linearize a representation, starting at offset 0
-  ; I sort it to get a nice output and because it's needed by my degree of polyphony calculator
-  (define (linearize element) (linearize-helper element 0))
+  (define (linearize element)
+    (linearize-helper element 0))
 
-  ; In our base case we have a note and we use the constructor provided by KN to make an absolute note
+  ; In our base case I have a note and I use the constructor provided by KN to make an absolute note
+  ; This function takes an offset which is recursively determined by the helper functions for linearization of sequential and parallel compositions
   (define (linearize-note element offset)
     (list (note-abs-time-with-duration offset (get-instrument-channel (get-instrument element)) (get-pitch element) 80 (get-duration element))))
 
-  ; When we linearize the tail of the sequence, we must add the length of the head
+  ; When I linearize the tail of the sequence, I pass add the duration of the head to the current offset
   (define (linearize-sequence elements offset)
     (if (null? elements) '()
         (let ((head (car elements)))
           (append (linearize-helper head offset) (linearize-sequence (cdr elements) (+ (get-duration head) offset))))))
 
-  ; When we linearize the tail of a parallel composition, we use the same offset as the initial one in the tail
+  ; Helper function for linearization of parallel compositions
+  ; When I linearize the tail of a parallel composition, I use the same offset as the initial one in the tail
+  ; Unlike sequential compositions, the order of elements in a parallel compositions does not affect the offsets
   (define (linearize-parallel elements offset)
     (if (null? elements) '()
         (let ((head (car elements)))
           (append (linearize-helper head offset) (linearize-parallel (cdr elements) offset)))))
 
   ; Note that the composition helpers handle updating offsets. Pauses "return" nothing, they serve only to update the offsets
+  ; Essentially, we don't care about offsets if our entire song consists of a single note, since nothing can follow it
   (define (linearize-helper element offset)
     (cond ((note? element) (linearize-note element offset))
           ((sequence? element) (linearize-sequence (get-elements element) offset))
@@ -240,24 +273,25 @@
   (define abs-note-start cadr)
   (define abs-note-duration (lambda (e) (cadr (cddddr e))))
   (define (sort-by-end list)
-    (sort list < #:key (lambda (abs-note) (+ (abs-note-duration abs-note) (abs-note-start abs-note)))))
+    (sort list < #:key
+          (lambda (abs-note) (+ (abs-note-duration abs-note) (abs-note-start abs-note)))))
 
   ; Calculate degree of polyphony. I re-use the linearize function in order to get the start time and duration of notes
   (define (polyphony-degree element)
     (if (music-element? element)
       (let ((linearized (sort-by-end (linearize element))))
-        (apply max (polyphony-helper linearized))) ; Since polyphony-helper returns a list of polyphonies, we need to apply max to get the highest degree
+        (apply max (polyphony-helper linearized))) ; Since polyphony-helper returns a list of polyphonies, I need to apply max to get the highest degree
       (error "Cannot determine degree of polyphony for a non-music element.")))
 
   ; Higher order function for determining overlap with some other element
   (define (overlap? element)
     (let* ((own-start (abs-note-start element))
            (own-end (+ (abs-note-duration element) own-start)))
-      (lambda (other) (let* ((other-start (abs-note-start other))
-                             (other-end (+ (abs-note-duration other) other-start))) ; Do we need this?
+      (lambda (other) (let* ((other-start (abs-note-start other)))
                         (and (>= other-start own-start) (< other-start own-end))))))
 
-  ; The basic principle is that for each element (head), we check if the remainder of elements overlap with this element. NOT an efficient solution, but it does the job
+  ; The basic principle is that for each element (head), I check if the remainder of elements overlap with this element
+  ; A more efficient solution may have been to have a counter and keep track of when an abs-note starts and when it ends
   (define (polyphony-helper elements)
     (if (null? elements) (list 0) ; If the list is empty, the degree of polyphony is 0
         (let* ((head (car elements))
