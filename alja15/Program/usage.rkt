@@ -70,9 +70,9 @@ note-fs
 
 (define canon
   (parallel a-canon-sequence
-            (sequence (pause 6/4) (transpose 10 a-canon-sequence))
-            (sequence (pause 10/4) (transpose 20 a-canon-sequence))
-            (sequence (pause 14/4) (transpose -10 a-canon-sequence))))
+            (sequence (pause 1) (transpose 10 a-canon-sequence))
+            (sequence (pause 2) (transpose 20 a-canon-sequence))
+            (sequence (pause 3) (transpose -10 a-canon-sequence))))
 
 (linearize canon)
 
@@ -84,9 +84,3 @@ note-fs
 
 (display "What is the degree of polyphony of two parallel canons?\n")
 (polyphony-degree (parallel canon canon))
-
-(define parse-test (parallel (note 'C 4 inst 1/2)
-                             (sequence (note 'G 4 inst 1/8) (note 'D 4 inst 1/8))))
-(polyphony-degree parse-test)
-
-
